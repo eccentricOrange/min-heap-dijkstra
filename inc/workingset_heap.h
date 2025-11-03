@@ -2,6 +2,7 @@
 #define WORKINGSET_HEAP_H
 
 #include "minheap.h"
+#include <stdlib.h>
 #include "limits.h"
 
 // We use 4 heaps. A real implementation would grow this list.
@@ -10,7 +11,7 @@
 
 
 typedef struct {
-    MinHeap_TypeDef heaps[NUM_HEAPS];
+    MinHeap_TypeDef* heaps[NUM_HEAPS];
     int max_sizes[NUM_HEAPS];
 } WorkingSetHeap_TypeDef;
 
@@ -20,7 +21,8 @@ typedef struct {
  */
 void initWorkingSetHeap(WorkingSetHeap_TypeDef* wsHeap) {
     for (int i = 0; i < NUM_HEAPS; i++) {
-        initMinHeap(&wsHeap->heaps[i]);
+        wsHeap->heaps[i] = (MinHeap_TypeDef*)malloc(sizeof(MinHeap_TypeDef));
+        initMinHeap(wsHeap->heaps[i]);
     }
     
     // Max sizes: 2, 4, 16, 256 (doubly exponential 2^(2^i))
@@ -36,7 +38,7 @@ void initWorkingSetHeap(WorkingSetHeap_TypeDef* wsHeap) {
  */
 int isWsHeapEmpty(WorkingSetHeap_TypeDef* wsHeap) {
     for (int i = 0; i < NUM_HEAPS; i++) {
-        if (!isMinHeapEmpty(&wsHeap->heaps[i])) {
+        if (!isMinHeapEmpty(wsHeap->heaps[i])) {
             return 0;
         }
     }
@@ -50,31 +52,36 @@ int isWsHeapEmpty(WorkingSetHeap_TypeDef* wsHeap) {
  */
 int wsHeapInsert(WorkingSetHeap_TypeDef* wsHeap, int item, int priority) {
     
-    MinHeap_TypeDef carryHeap;
-    initMinHeap(&carryHeap);
+    MinHeap_TypeDef* carryHeap = (MinHeap_TypeDef*)malloc(sizeof(MinHeap_TypeDef));
+    if (carryHeap == NULL) return -1;
     
-    if (heapPush(&carryHeap, item, priority) != 0) {
-        return -1; // Should not happen
+    initMinHeap(carryHeap);
+    
+    if (heapPush(carryHeap, item, priority) != 0) {
+        free(carryHeap);
+        return -1; 
     }
 
     for (int i = 0; i < NUM_HEAPS; i++) {
-        if (wsHeap->heaps[i].size + carryHeap.size <= wsHeap->max_sizes[i]) {
-            // It fits! Merge and stop.
-            if (heapMerge(&wsHeap->heaps[i], &carryHeap) != 0) {
+        if (wsHeap->heaps[i]->size + carryHeap->size <= wsHeap->max_sizes[i]) {
+            
+            if (heapMerge(wsHeap->heaps[i], carryHeap) != 0) {
                  printf("WS_HEAP MERGE FAILED!\n");
+                 free(carryHeap);
                  return -1;
             }
-            return 0; // Success
+            free(carryHeap);
+            return 0; 
         } else {
-            // Doesn't fit. Current heap becomes the new carry.
-            // The old carry takes its place.
-            MinHeap_TypeDef temp = wsHeap->heaps[i];
+            
+            MinHeap_TypeDef* temp = wsHeap->heaps[i];
             wsHeap->heaps[i] = carryHeap;
             carryHeap = temp;
         }
     }
     
     printf("WS_HEAP OVERFLOW! FINAL CARRY FAILED.\n");
+    free(carryHeap);
     return -1;
 }
 
@@ -88,9 +95,9 @@ int wsHeapDeleteMin(WorkingSetHeap_TypeDef* wsHeap, HeapNode_TypeDef* minNode) {
 
     // 1. Find which heap has the global minimum
     for (int i = 0; i < NUM_HEAPS; i++) {
-        if (!isMinHeapEmpty(&wsHeap->heaps[i])) {
+        if (!isMinHeapEmpty(wsHeap->heaps[i])) {
             HeapNode_TypeDef currentMin;
-            heapPeekMin(&wsHeap->heaps[i], &currentMin);
+            heapPeekMin(wsHeap->heaps[i], &currentMin);
             
             if (currentMin.priority < bestPriority) {
                 bestPriority = currentMin.priority;
@@ -107,7 +114,7 @@ int wsHeapDeleteMin(WorkingSetHeap_TypeDef* wsHeap, HeapNode_TypeDef* minNode) {
     // 2. Pop the item from *only that heap*
     // This is the key: the cost is O(log(size of H_i)),
     // not O(log(Total N)).
-    return heapPopMin(&wsHeap->heaps[bestHeapIndex], minNode);
+    return heapPopMin(wsHeap->heaps[bestHeapIndex], minNode);
 }
 
 
