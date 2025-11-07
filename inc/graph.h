@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "limits.h"
-#include "queue.h"
 #include "workingset_heap.h"
 
 #ifndef GRAPH_H
