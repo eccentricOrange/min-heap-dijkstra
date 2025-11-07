@@ -4,6 +4,9 @@
 #include "queue.h"
 #include "workingset_heap.h"
 
+#ifndef GRAPH_H
+#define GRAPH_H
+
 #define MAX_GRAPH_SIZE 20
 
 typedef struct {
@@ -115,3 +118,5 @@ void dijkstra_ws(Graph* graph, int start) {
         }
     }
 }
+
+#endif // GRAPH_H
